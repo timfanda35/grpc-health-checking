@@ -16,6 +16,13 @@
 
 # Dependency directories (remove the comment below to include it)
 # vendor/
+target/
 
 # Go workspace file
 go.work
+
+# GoLand
+.idea
+
+# macOS
+.DS_Store

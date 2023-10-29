@@ -1,5 +1,6 @@
 /*
 Copyright 2022 The Kubernetes Authors.
+Copyright 2023 Bear Su.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +21,8 @@ package grpchealthchecking
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 	"log"
 	"net"
 	"time"
@@ -28,7 +31,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
@@ -52,8 +54,8 @@ var (
 )
 
 func init() {
-	CmdGrpcHealthChecking.Flags().IntVar(&port, "port", 5000, "Port number.")
-	CmdGrpcHealthChecking.Flags().IntVar(&httpPort, "http-port", 8080, "Port number for the /make-serving and /make-not-serving.")
+	CmdGrpcHealthChecking.Flags().IntVar(&port, "port", 8000, "Port number.")
+	CmdGrpcHealthChecking.Flags().IntVar(&httpPort, "http-port", 8080, "Port number for the /make-serving, /make-not-serving and /healthcheck.")
 	CmdGrpcHealthChecking.Flags().IntVar(&delayUnhealthySec, "delay-unhealthy-sec", -1, "Number of seconds to delay before start reporting NOT_SERVING, negative value indicates never.")
 	CmdGrpcHealthChecking.Flags().StringVar(&service, "service", "", "Service name to register the health check for.")
 	forceUnhealthy = nil
@@ -92,7 +94,7 @@ func NewHealthChecker(started time.Time) *HealthChecker {
 	}
 }
 
-func main(cmd *cobra.Command, args []string) {
+func startHttpEndpoint() {
 	started := time.Now()
 
 	http.HandleFunc("/make-not-serving", func(w http.ResponseWriter, r *http.Request) {
@@ -101,7 +103,7 @@ func main(cmd *cobra.Command, args []string) {
 		*forceUnhealthy = true
 		w.WriteHeader(200)
 		data := (time.Since(started)).String()
-		w.Write([]byte(data))
+		_, _ = w.Write([]byte(data))
 	})
 
 	http.HandleFunc("/make-serving", func(w http.ResponseWriter, r *http.Request) {
@@ -110,7 +112,14 @@ func main(cmd *cobra.Command, args []string) {
 		*forceUnhealthy = false
 		w.WriteHeader(200)
 		data := (time.Since(started)).String()
-		w.Write([]byte(data))
+		_, _ = w.Write([]byte(data))
+	})
+
+	http.HandleFunc("/healthcheck", func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("http healthy")
+		w.WriteHeader(200)
+		data := (time.Since(started)).String()
+		_, _ = w.Write([]byte(data))
 	})
 
 	go func() {
@@ -118,6 +127,10 @@ func main(cmd *cobra.Command, args []string) {
 		log.Printf("Http server starting to listen on %s", httpServerAdr)
 		log.Fatal(http.ListenAndServe(httpServerAdr, nil))
 	}()
+}
+
+func startGrpcEndpoint() {
+	started := time.Now()
 
 	serverAdr := fmt.Sprintf(":%d", port)
 	listenAddr, err := net.Listen("tcp", serverAdr)
@@ -129,10 +142,17 @@ func main(cmd *cobra.Command, args []string) {
 	healthService := NewHealthChecker(started)
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthService)
 
+	reflection.Register(grpcServer)
+
 	log.Printf("gRPC server starting to listen on %s", serverAdr)
 	if err = grpcServer.Serve(listenAddr); err != nil {
 		log.Fatal(fmt.Sprintf("Error while starting the gRPC server on the %s listen address %v", listenAddr, err.Error()))
 	}
+}
+
+func main(cmd *cobra.Command, args []string) {
+	startHttpEndpoint()
+	startGrpcEndpoint()
 
 	select {}
 }
