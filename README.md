@@ -122,3 +122,35 @@ Otherwise:
   "status": "NOT_SERVING"
 }
 ```
+
+## Containerize
+
+Build image
+
+```bash
+docker build -t grpc-health-checking .
+```
+
+Run image with default expose ports
+
+```bash
+docker run -it \
+  -p 8000:8000 \
+  -p 8080:8080 \
+  grpc-health-checking
+```
+
+Run image with customize ports
+
+```bash
+docker run -it \
+  -p 18000:18000 \
+  -p 18080:18080 \
+  grpc-health-checking --port 18000 --http-port 18080
+```
+
+You can also use the pre-build amd64 container image
+
+```
+ghcr.io/timfanda35/grpc-health-checking
+```
