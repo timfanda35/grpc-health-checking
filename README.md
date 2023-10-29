@@ -2,7 +2,61 @@
 
 A GRPC Health Checking Test Application
 
-Based on https://github.com/kubernetes/kubernetes/blob/master/test/images/agnhost/grpc-health-checking/grpc-health-checking.go
+Based on source:
+- https://github.com/kubernetes/kubernetes/blob/master/test/images/agnhost/grpc-health-checking/grpc-health-checking.go
+
+See blog for more information:
+- https://kubernetes.io/blog/2022/05/13/grpc-probes-now-in-beta/#trying-the-feature-out 
+
+## What does this repository do?
+
+- Just use the `grpc-health-checking` command of `agnhost`
+- Add HTTP health check path
+- Support GRPC Reflection for `grpcurl` convenience
+
+A Sample test yaml for kubernetes would be:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-grpc
+spec:
+  containers:
+  - name: grpc-health-checking
+    image: ghcr.io/timfanda35/grpc-health-checking:v0.1.0
+    ports:
+    - name: grpc
+      containerPort: 8000
+    - name: http
+      containerPort: 8080
+    readinessProbe:
+      grpc:
+        port: 8000
+```
+
+You could use the `httpGet` for readiness:
+
+```yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-grpc
+spec:
+  containers:
+  - name: grpc-health-checking
+    image: ghcr.io/timfanda35/grpc-health-checking:v0.1.0
+    ports:
+    - name: grpc
+      containerPort: 8000
+    - name: http
+      containerPort: 8080
+    readinessProbe:
+      httpGet:
+        scheme: HTTP
+        path: /healthcheck
+        port: 8080
+```
 
 ## Usage
 
@@ -99,7 +153,7 @@ grpc.reflection.v1.ServerReflection
 grpc.reflection.v1alpha.ServerReflection
 ```
 
-### GRPC Endpoint: `GRPC Health Check`
+### GRPC Endpoint: `grpc.health.v1.Health/Check`
 
 Check GRPC Service Healthy status.
 
